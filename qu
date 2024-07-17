@@ -1,0 +1,72 @@
+import ibm_db
+import pandas as pd
+import configparser
+import requests
+import json
+
+# Read configuration file
+config = configparser.ConfigParser()
+config.read('config.ini')
+
+# DB credentials
+dsn_hostname = config['db_credentials']['hostname']
+dsn_port = config['db_credentials']['port']
+dsn_database = config['db_credentials']['database']
+dsn_uid = config['db_credentials']['username']
+dsn_pwd = config['db_credentials']['password']
+
+# API details
+api_url = config['api_details']['api_url']
+api_key = config['api_details']['api_key']
+
+# DSN connection string
+dsn = (
+    f"DATABASE={dsn_database};"
+    f"HOSTNAME={dsn_hostname};"
+    f"PORT={dsn_port};"
+    f"PROTOCOL=TCPIP;"
+    f"UID={dsn_uid};"
+    f"PWD={dsn_pwd};"
+)
+
+try:
+    # Establish DB2 connection
+    conn = ibm_db.connect(dsn, "", "")
+    print("Connected to the database successfully.")
+except Exception as e:
+    print(f"Failed to connect to the database: {e}")
+
+# SQL Query
+sql = "SELECT * FROM your_table_name"
+
+try:
+    # Execute the query
+    stmt = ibm_db.exec_immediate(conn, sql)
+    
+    # Fetch the results into a pandas DataFrame
+    dataframe = pd.read_sql(sql, conn)
+    print("Query executed successfully and data loaded into DataFrame.")
+    print(dataframe)
+except Exception as e:
+    print(f"Failed to execute query: {e}")
+
+# Example of using DataFrame data to make API calls
+# Assuming we're sending a JSON payload with data from the DataFrame
+for index, row in dataframe.iterrows():
+    payload = {
+        "column1": row['column1'],
+        "column2": row['column2'],
+        # Add more columns as needed
+    }
+    headers = {
+        'Authorization': f'Bearer {api_key}',
+        'Content-Type': 'application/json'
+    }
+    response = requests.post(api_url, headers=headers, json=payload)
+    if response.status_code == 200:
+        print(f"API call successful for index {index}")
+    else:
+        print(f"API call failed for index {index}: {response.text}")
+
+# Close the connection
+ibm_db.close(conn)
